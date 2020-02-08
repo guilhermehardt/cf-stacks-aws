@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Code Commmit and Build Stack'
+Parameters:
+  CCommitRepositoryName:
+    Description: 'Code Commit repository name'
+    Type: String
+    Default: 'my-example'
+  ECRRepositoryName:
+    Description: 'The image name on ECR'
+    Type: String
+    Default: 'awslabs/example-image'
+  CBuildProjectName:
+    Description: 'The code build project name'
+    Type: String
+    Default: 'my-example'
+Resources:
+  CCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref CCommitRepositoryName
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Ref ECRRepositoryName
+  CBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Principal:
+              Service: "codebuild.amazonaws.com"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+  CBuildProjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "code-build.policy-${CBuildProjectName}"
+      Roles:
+        - !Ref CBuildRole
+      PolicyDocument:
+        Statement:
+          - Action:
+              - ecr:Get*
+              - ecr:Describe*
+              - ecr:List*
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - codecommit:GitPull
+              - codecommit:CancelUploadArchive
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:GetUploadArchiveStatus
+            Effect: Allow
+            Resource:
+              - !GetAtt CCommitRepository.Arn
+          - Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:GetRepositoryPolicy
+              - ecr:InitiateLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:PutImage
+              - ecr:CompleteLayerUpload
+              - ecr:DescribeImages
+              - ecr:DescribeRepositories
+              - ecr:BatchGetImage
+              - ecr:ListImages
+            Effect: Allow
+            Resource:
+              - !GetAtt ECRRepository.Arn
+  CBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref CBuildProjectName
+      ServiceRole: !Ref CBuildRole
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        PrivilegedMode: true
+      Source:
+        Type: CODECOMMIT
+        Location:
+          Fn::Join:
+          - ''
+          - - https://git-codecommit.
+            - Ref: AWS::Region
+            - ".amazonaws.com/v1/repos/"
+            - Ref: CCommitRepositoryName
+      Artifacts:
+        Type: NO_ARTIFACTS

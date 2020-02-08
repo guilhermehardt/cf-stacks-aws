@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: S3 Bucket with CORS enabled
+Parameters:
+  BucketName:
+    Description: The Bucket name
+    Type: String
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${BucketName}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      CorsConfiguration:
+        CorsRules:
+        - AllowedMethods: ['GET']
+          AllowedOrigins: ['*']
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: Bucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action:
+            - s3:GetObject
+            Resource: !Sub "arn:aws:s3:::${BucketName}/*"
+  Group:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "s3-${BucketName}"
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "s3-${BucketName}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:*
+            Resource: !Sub "arn:aws:s3:::${BucketName}"
+          - Effect: Allow
+            Action:
+              - s3:*
+            Resource: !Sub "arn:aws:s3:::${BucketName}/*"
+      Groups: [!Ref Group]

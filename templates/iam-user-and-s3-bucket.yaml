@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Create a IAM user and S3 private bucket"
+Parameters:
+  UserName:
+    Description: "The username"
+    Type: String
+  BucketName:
+    Description: "The bucket name"
+    Type: String
+Resources:
+  # IAM Resources
+  User:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: !Sub "${UserName}-${AWS::Region}"
+  Group:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "group-${UserName}-${AWS::Region}"
+  AccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref User
+  UserToGroupAddition:
+    Type: AWS::IAM::UserToGroupAddition
+    Properties:
+      GroupName: !Ref Group
+      Users: [!Ref User]
+  CustomPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: !Sub "s3-${BucketName}-${AWS::Region}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:ListBucket"
+            Resource: !Sub "arn:aws:s3:::${BucketName}-${AWS::Region}"
+          - Effect: "Allow"
+            Action:
+              - "s3:*"
+            Resource: !Sub "arn:aws:s3:::${BucketName}-${AWS::Region}/*"
+      Groups: [!Ref "Group"]
+  # S3 Resources
+  Bucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub "${BucketName}-${AWS::Region}"
+Outputs:
+  AccessKey:
+    Description: "AWS_ACCESS_KEY_ID"
+    Value: !Ref AccessKey
+  SecretKey:
+    Description: "AWS_SECRET_ACCESS_KEY"
+    Value: !GetAtt [AccessKey, SecretAccessKey]

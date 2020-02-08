@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Cloudfront Stack"
+Parameters:
+  Domain:
+    Description: "The Domain Name"
+    Type: String
+  AcmCertificateArn:
+    Description: "The ACM certificate ARN"
+    Type: String
+Resources:
+  Group:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "cf-${Domain}"
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "cf-${Domain}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "cloudfront:*"
+            Resource:
+              - "*"
+      Groups: [!Ref "Group"]
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Sub "${Domain}"
+        Enabled: true
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          AcmCertificateArn: !Ref AcmCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.1_2016
+        HttpVersion: http2
+        Origins:
+          - DomainName: !Join [ ".", [ !Sub "${Domain}", !Join [ "-", [ "s3", "website", !Ref 'AWS::Region' ] ], "amazonaws.com" ] ]
+            Id: !Sub "${Domain}"
+            CustomOriginConfig:
+              HTTPPort: '80'
+              HTTPSPort: '443'
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 5
+              OriginKeepaliveTimeout: 1
+              OriginSSLProtocols: [ "TLSv1", "TLSv1.1", "TLSv1.2" ]
+        DefaultCacheBehavior:
+          TargetOriginId: !Sub "${Domain}"
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - HEAD
+            - GET
+          DefaultTTL: 600
+          MinTTL: 0
+          MaxTTL: 600
+          ForwardedValues:
+            Headers:
+              - Access-Control-Request-Method
+              - Access-Control-Request-Headers
+              - Origin
+            Cookies:
+              Forward: none
+            QueryString: false
+          Compress: true
+Outputs:
+  CloudFrontDomain:
+    Value: !GetAtt Distribution.DomainName
+  CloudFrontDomain:
+    Value: !GetAtt Distribution.DomainName
